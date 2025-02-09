@@ -15,56 +15,61 @@ from Levenshtein import distance as levenshtein_distance
 try:
     import imdb
 except ImportError:
-    print('You bad boy!  You need to install the Cinemagoer package!')
+    print('You need to install the Cinemagoer package!')
     sys.exit(1)
 
 
-if len(sys.argv) != 2:
-    print('Only one argument is required:')
-    print('  %s "movie title"' % sys.argv[0])
-    sys.exit(2)
+def main():
+    # التحقق من صحة الوسائط
+    if len(sys.argv) != 2:
+        print('Usage: %s "movie title"' % sys.argv[0])
+        sys.exit(2)
 
-title = sys.argv[1].lower()
+    title = sys.argv[1].lower()
 
-i = imdb.IMDb()
+    # إنشاء كائن IMDb
+    i = imdb.IMDb()
 
-out_encoding = sys.stdout.encoding or sys.getdefaultencoding()
+    try:
+        # البحث عن الأفلام
+        results = i.search_movie(title)
+    except imdb.IMDbError as e:
+        print("Error occurred while searching for the movie:")
+        print(e)
+        sys.exit(3)
 
-try:
-    # Do the search, and get the results (a list of Movie objects).
-    results = i.search_movie(title)
-except imdb.IMDbError as e:
-    print("Probably you're not connected to Internet.  Complete error report:")
-    print(e)
-    sys.exit(3)
+    # التحقق من وجود نتائج
+    if not results:
+        print('No matches for "%s", sorry.' % title)
+        sys.exit(0)
 
-if not results:
-    print('No matches for "%s", sorry.' % title)
-    sys.exit(0)
+    # فلترة النتائج لتشمل الأفلام فقط
+    movie_results = [result for result in results if result.get('kind') == 'movie']
 
-# Filter results to include only movies
-movie_results = [result for result in results if result.get('kind') == 'movie']
+    if not movie_results:
+        print('No movie matches for "%s", sorry.' % title)
+        sys.exit(0)
 
-if not movie_results:
-    print('No movie matches for "%s", sorry.' % title)
-    sys.exit(0)
+    # اختيار أفضل تطابق من أول نتيجتين باستخدام Levenshtein distance
+    top_two_results = movie_results[:2]
+    best_match = min(
+        top_two_results,
+        key=lambda movie: levenshtein_distance(title, movie.get('title', '').lower())
+    )
 
-# Choose the best match from the top two results based on Levenshtein distance
-top_two_results = movie_results[:2]
-best_match = min(top_two_results, key=lambda movie: levenshtein_distance(title, movie.get('title', '').lower()))
+    # طباعة أفضل نتيجة
+    print('Best match for "%s":' % title)
+    print('movieID\t: imdbID : title')
+    outp = '%s\t: %s : %s' % (best_match.movieID, i.get_imdbID(best_match),
+                              best_match['long imdb title'])
+    print(outp)
 
-# Print the best result
-print('    Best match for "%s":' % title)
-print('movieID\t: imdbID : title')
-outp = '%s\t: %s : %s' % (best_match.movieID, i.get_imdbID(best_match),
-                          best_match['long imdb title'])
-print(outp)
+    # تحديث معلومات الفيلم
+    i.update(best_match)
 
-# This is a Movie instance.
-movie = best_match
+    # طباعة ملخص الفيلم
+    print(best_match.summary())
 
-# So far the Movie object only contains basic information like the
-# title and the year; retrieve main information:
-i.update(movie)
 
-print(movie.summary())
+if __name__ == "__main__":
+    main()
