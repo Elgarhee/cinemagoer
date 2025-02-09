@@ -11,6 +11,7 @@ Notice that movie_id, using 'sql', are not the same IDs used on the web.
 """
 
 import sys
+from Levenshtein import distance as levenshtein_distance
 
 # Import the Cinemagoer package.
 try:
@@ -25,16 +26,15 @@ if len(sys.argv) != 2:
     print('  %s "movie_id"' % sys.argv[0])
     sys.exit(2)
 
-movie_id = sys.argv[1]
+movie_id = sys.argv[1].lower()
 
 i = imdb.IMDb()
 
 try:
-    # Get a Movie object with the data about the movie identified by
-    # the given movie_id.
+    # Get a Movie object with the data about the movie identified by the given movie_id.
     movie = i.get_movie(movie_id)
 except imdb.IMDbError as e:
-    print("Probably you're not connected to Internet.  Complete error report:")
+    print("Probably you're not connected to Internet. Complete error report:")
     print(e)
     sys.exit(3)
 
@@ -43,62 +43,27 @@ if not movie:
     print('It seems that there\'s no movie with movie_id "%s"' % movie_id)
     sys.exit(4)
 
-# XXX: this is the easier way to print the main info about a movie;
-# calling the summary() method of a Movie object will returns a string
-# with the main information about the movie.
-# Obviously it's not really meaningful if you want to know how
-# to access the data stored in a Movie object, so look below; the
-# commented lines show some ways to retrieve information from a
-# Movie object.
+# Show the main info about the movie
 print(movie.summary())
 
-# Show some info about the movie.
-# This is only a short example; you can get a longer summary using
-# 'print movie.summary()' and the complete set of information looking for
-# the output of the movie.keys() method.
-#
-# print '==== "%s" / movie_id: %s ====' % (movie['title'], movie_id)
-# XXX: use the IMDb instance to get the IMDb web URL for the movie.
-# imdbURL = i.get_imdbURL(movie)
-# if imdbURL:
-#    print 'IMDb URL: %s' % imdbURL
-#
-# XXX: many keys return a list of values, like "genres".
-# genres = movie.get('genres')
-# if genres:
-#    print 'Genres: %s' % ' '.join(genres)
-#
-# XXX: even when only one value is present (e.g.: movie with only one
-#      director), fields that can be multiple are ALWAYS a list.
-#      Note that the 'name' variable is a Person object, but since its
-#      __str__() method returns a string with the name, we can use it
-#      directly, instead of name['name']
-# director = movie.get('director')
-# if director:
-#    print 'Director(s): ',
-#    for name in director:
-#        sys.stdout.write('%s ' % name)
-#    print ''
-#
-# XXX: notice that every name in the cast is a Person object, with a
-#      currentRole instance variable, which is a string for the played role.
-# cast = movie.get('cast')
-# if cast:
-#    print 'Cast: '
-#    cast = cast[:5]
-#    for name in cast:
-#        print '      %s (%s)' % (name['name'], name.currentRole)
-# XXX: some information are not lists of strings or Person objects, but simple
-#      strings, like 'rating'.
-# rating = movie.get('rating')
-# if rating:
-#    print 'Rating: %s' % rating
-# XXX: an example of how to use information sets; retrieve the "trivia"
-#      info set; check if it contains some data, select and print a
-#      random entry.
-# import random
-# i.update(movie, info=['trivia'])
-# trivia = movie.get('trivia')
-# if trivia:
-#    rand_trivia = trivia[random.randrange(len(trivia))]
-#    print 'Random trivia: %s' % rand_trivia
+# Additional code to demonstrate Levenshtein distance for movie title selection
+if len(sys.argv) == 3:
+    search_title = sys.argv[2].lower()
+    results = i.search_movie(search_title)
+
+    if results:
+        # Filter results to include only movies
+        movie_results = [result for result in results if result.get('kind') == 'movie']
+
+        if movie_results:
+            # Choose the best match from the top two results based on Levenshtein distance
+            top_two_results = movie_results[:2]
+            best_match = min(top_two_results, key=lambda movie: levenshtein_distance(search_title, movie.get('title', '').lower()))
+
+            # Print the best result
+            print(f'    Best match for "{search_title}":')
+            print(best_match.summary())
+        else:
+            print(f'No movie matches for "{search_title}", sorry.')
+    else:
+        print(f'No matches for "{search_title}", sorry.')
